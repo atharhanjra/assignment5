@@ -130,3 +130,33 @@ def test_from_dict_result_mismatch(caplog):
 
     # Assert
     assert "Loaded calculation result 10 differs from computed result 5" in caplog.text
+
+@pytest.mark.parametrize("operation, a, b, expected", [
+    ("Addition", "2", "3", "Addition(2, 3) = 5"),
+    ("Subtraction", "10", "4", "Subtraction(10, 4) = 6"),
+    ("Multiplication", "4", "5", "Multiplication(4, 5) = 20"),
+])
+def test_str(operation, a, b, expected):
+    """str() shows the operation, operands, and result."""
+    calc = Calculation(operation=operation, operand1=Decimal(a), operand2=Decimal(b))
+    assert str(calc) == expected
+
+
+def test_repr():
+    """repr() shows all the details of the calculation."""
+    calc = Calculation(operation="Addition", operand1=Decimal("2"), operand2=Decimal("3"))
+    assert repr(calc).startswith("Calculation(operation='Addition', operand1=2, operand2=3, result=5")
+
+
+@pytest.mark.parametrize("other", ["not a calculation", 5, None])
+def test_compare_with_non_calculation(other):
+    """Comparing a calculation to something else doesn't count as equal."""
+    calc = Calculation(operation="Addition", operand1=Decimal("2"), operand2=Decimal("3"))
+    assert calc.__eq__(other) is NotImplemented
+    assert calc != other
+
+
+def test_calculation_failed():
+    """A result too big to compute raises an OperationError."""
+    with pytest.raises(OperationError, match="Calculation failed"):
+        Calculation(operation="Power", operand1=Decimal("10"), operand2=Decimal("1000"))
