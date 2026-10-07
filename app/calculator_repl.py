@@ -51,7 +51,7 @@ def calculator_repl():
                     try:
                         calc.save_history()
                         print("History saved successfully.")
-                    except Exception as e:
+                    except OperationError as e:
                         print(f"Warning: Could not save history: {e}")
                     print("Goodbye!")
                     break
@@ -94,7 +94,7 @@ def calculator_repl():
                     try:
                         calc.save_history()
                         print("History saved successfully")
-                    except Exception as e:
+                    except OperationError as e:
                         print(f"Error saving history: {e}")
                     continue
 
@@ -103,7 +103,7 @@ def calculator_repl():
                     try:
                         calc.load_history()
                         print("History loaded successfully")
-                    except Exception as e:
+                    except OperationError as e:
                         print(f"Error loading history: {e}")
                     continue
 
@@ -135,9 +135,6 @@ def calculator_repl():
                     except (ValidationError, OperationError) as e:
                         # Handle known exceptions related to validation or operation errors
                         print(f"Error: {e}")
-                    except Exception as e:
-                        # Handle any unexpected exceptions
-                        print(f"Unexpected error: {e}")
                     continue
 
                 # Handle unknown commands
@@ -151,10 +148,6 @@ def calculator_repl():
                 # Handle end-of-file (e.g., Ctrl+D) gracefully
                 print("\nInput terminated. Exiting...")
                 break
-            except Exception as e:
-                # Handle any other unexpected exceptions
-                print(f"Error: {e}")
-                continue
 
     except Exception as e:
         # Handle fatal errors during initialization
