@@ -1,3 +1,4 @@
+import logging
 import datetime
 from pathlib import Path
 import pandas as pd
@@ -178,3 +179,82 @@ def test_calculator_repl_help(mock_print, mock_input):
 def test_calculator_repl_addition(mock_print, mock_input):
     calculator_repl()
     mock_print.assert_any_call("\nResult: 5")
+
+def make_calculator(tmp_path):
+    """Create a calculator that keeps its files in a temporary test folder."""
+    calc = Calculator(CalculatorConfig(base_dir=tmp_path))
+    calc.clear_history()
+    return calc
+
+
+class BrokenOperation:
+    """A fake operation that always fails, used to test error handling."""
+
+    def execute(self, a, b):
+        raise RuntimeError("something broke")
+
+    def __str__(self):
+        return "Broken"
+
+
+def test_setup_logging_fails(monkeypatch, capsys, tmp_path):
+    """If logging can't be set up, an error is printed and raised."""
+    calc = make_calculator(tmp_path)
+
+    def broken_logging(**kwargs):
+        raise OSError("no permission")
+
+    monkeypatch.setattr(logging, "basicConfig", broken_logging)
+    with pytest.raises(OSError):
+        calc._setup_logging()
+    assert "Error setting up logging" in capsys.readouterr().out
+
+
+def test_history_size_limit(tmp_path):
+    """When history is full, the oldest calculation is removed."""
+    calc = make_calculator(tmp_path)
+    calc.config.max_history_size = 1
+    calc.set_operation(OperationFactory.create_operation("add"))
+    calc.perform_operation("1", "1")
+    calc.perform_operation("2", "2")
+    assert len(calc.history) == 1
+    assert calc.history[0].result == Decimal("4")
+
+
+def test_unexpected_operation_error(tmp_path):
+    """An unexpected error during an operation becomes an OperationError."""
+    calc = make_calculator(tmp_path)
+    calc.set_operation(BrokenOperation())
+    with pytest.raises(OperationError, match="Operation failed"):
+        calc.perform_operation("1", "2")
+
+
+def test_save_history_fails(monkeypatch, tmp_path):
+    """If the CSV file can't be written, saving raises an OperationError."""
+    calc = make_calculator(tmp_path)
+
+    def broken_to_csv(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(pd.DataFrame, "to_csv", broken_to_csv)
+    with pytest.raises(OperationError, match="Failed to save history"):
+        calc.save_history()
+
+
+def test_load_history_fails(tmp_path):
+    """A broken CSV file makes loading raise an OperationError."""
+    calc = make_calculator(tmp_path)
+    calc.config.history_file.write_text("wrong,columns\n1,2\n")
+    with pytest.raises(OperationError, match="Failed to load history"):
+        calc.load_history()
+
+
+def test_get_history_dataframe(tmp_path):
+    """The history can be returned as a pandas DataFrame."""
+    calc = make_calculator(tmp_path)
+    calc.set_operation(OperationFactory.create_operation("add"))
+    calc.perform_operation("2", "3")
+    df = calc.get_history_dataframe()
+    assert len(df) == 1
+    assert df.iloc[0]["operation"] == "Addition"
+    assert df.iloc[0]["result"] == "5"
